@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import { responseSymbol } from 'next/dist/server/web/spec-compliant/fetch-event';
 import { parseCookies, setCookie } from 'nookies'
+import { signOut } from '../contexts/AuthContext';
 
 let cookies = parseCookies();
 let isRefreshing = false;
@@ -63,10 +63,10 @@ api.interceptors.response.use(res => res, (error:AxiosError) => {
                     } 
                 })
             })        
-        } else {
-
-        }
-        
-        
+        } else {            
+            signOut();            
+        }        
     }
+
+    return Promise.reject(error);
 } )
