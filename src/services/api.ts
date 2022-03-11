@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { parseCookies, setCookie } from 'nookies'
-import { signOut } from '../contexts/AuthContext';
+import { signOut } from '../hooks/useAuth';
 import { AuthTokenError } from './errors/AuthTokenError';
 
 let isRefreshing = false;
@@ -16,10 +16,12 @@ export function setupApiClient(ctx = undefined) {
         }
     })
     
-    api.interceptors.response.use(res => res, (error:AxiosError) => {         
+    api.interceptors.response.use(response => {
+        return response
+    }, (error:AxiosError) => {         
+        let cookies = parseCookies(ctx);    
         if(error.response.status === 401) {
-            if (error.response.data?.code === 'token.expired') {
-                cookies = parseCookies();
+            if (error.response.data?.code === 'token.expired') {                
                 const refreshToken = cookies['nextauth.refreshToken'];
                 const originalConfig = error.config;
     
@@ -31,12 +33,12 @@ export function setupApiClient(ctx = undefined) {
                     }).then(response => {
                         const { token } = response.data;
                         
-                        setCookie(undefined, 'nextauth.token', token, {
+                        setCookie(ctx, 'nextauth.token', token, {
                             maxAge: 60 * 60 * 24 * 30, // 30 days
                             path: '/'
                         })
             
-                        setCookie(undefined, 'nextauth.refreshToken', response.data.refreshToken, {
+                        setCookie(ctx, 'nextauth.refreshToken', response.data.refreshToken, {
                             maxAge: 60 * 60 * 24 * 30,
                             path: '/'
                         })
@@ -48,8 +50,8 @@ export function setupApiClient(ctx = undefined) {
                     }).catch(err => {
                         failedRequestsQueue.forEach(request => request.onFailure(err))
                         failedRequestsQueue = [];
-    
-                        if (typeof window === "undefined") {
+                        
+                        if (typeof window !== "undefined") {
                             signOut();
                         } else {
                             return Promise.reject(new AuthTokenError())
@@ -71,9 +73,9 @@ export function setupApiClient(ctx = undefined) {
                         } 
                     })
                 })        
-            } else {            
-                if (typeof window === "undefined") {
-                    signOut();            
+            } else {                           
+                if (typeof window !== "undefined") {
+                    signOut();
                 } else {
                     return Promise.reject(new AuthTokenError())
                 }
